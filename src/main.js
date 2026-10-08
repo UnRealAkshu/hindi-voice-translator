@@ -8,48 +8,60 @@ app.innerHTML = `
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark">हि</div>
-        <div>
-          <strong>HindiVoice</strong>
-          <span>AI Translator</span>
-        </div>
+        <div><strong>HindiVoice</strong><span>AI Translator</span></div>
       </div>
-      <div class="status-chip" id="modelStatus"><i></i><span>ML models ready to load</span></div>
+      <div class="status-chip" id="modelStatus"><i></i><span>Ready</span></div>
     </header>
 
     <main>
       <section class="hero">
-        <div class="badge">MACHINE LEARNING WEB APP</div>
-        <h1>Say it in English.<br><span>Hear it in Hindi.</span></h1>
-        <p>Type an English sentence or record your voice. Translation and speech recognition are powered by ML models running in your browser.</p>
+        <div class="badge">LIVE AI TRANSLATOR</div>
+        <h1>Talk naturally.<br><span>Hear Hindi instantly.</span></h1>
+        <p>Fast local speech recognition, neural translation and Hindi voice playback — designed to feel like a live interpreter.</p>
+      </section>
+
+      <section class="live-card panel">
+        <div class="live-head">
+          <div>
+            <label>LIVE INTERPRETER</label>
+            <h2>English → Hindi</h2>
+          </div>
+          <div class="live-state" id="liveState"><i></i><span>OFF</span></div>
+        </div>
+        <div class="live-grid">
+          <div class="live-transcript">
+            <div class="mini-label">YOU SAID</div>
+            <div id="liveEnglish">Start Live Translate and speak normally.</div>
+          </div>
+          <div class="live-arrow">→</div>
+          <div class="live-transcript hindi">
+            <div class="mini-label">HINDI</div>
+            <div id="liveHindi">आपका अनुवाद यहाँ आएगा।</div>
+          </div>
+        </div>
+        <div class="live-actions">
+          <button class="btn btn-primary live-btn" id="liveBtn">● Start Live Translate</button>
+          <label class="toggle"><input id="autoSpeak" type="checkbox" checked><span></span> Auto speak Hindi</label>
+        </div>
+        <div class="hint" id="liveHint">For the lowest latency, Chrome/Chromium with on-device speech recognition is preferred. Whisper ML is used as a fallback.</div>
       </section>
 
       <section class="workspace">
-        <article class="panel input-panel">
-          <div class="panel-head">
-            <div><label>INPUT</label><h2>English</h2></div>
-            <span class="lang-code">eng_Latn</span>
-          </div>
-
+        <article class="panel">
+          <div class="panel-head"><div><label>TEXT MODE</label><h2>English</h2></div><span class="lang-code">eng_Latn</span></div>
           <textarea id="input" placeholder="Type something like “Where are you going?”"></textarea>
-
           <div class="control-row">
             <button class="btn btn-primary" id="translateBtn">Translate <span>→</span></button>
-            <button class="btn btn-ghost" id="micBtn"><span class="mic-dot">●</span> Speak</button>
+            <button class="btn btn-dark" id="speakBtn" disabled>🔊 Speak Hindi</button>
             <button class="btn btn-icon" id="clearBtn" title="Clear">⌫</button>
           </div>
-          <div class="hint" id="micHint">Voice mode uses on-device Whisper ML — no browser SpeechRecognition service.</div>
+          <div class="hint">Text mode is useful for testing the translation model separately.</div>
         </article>
 
-        <article class="panel output-panel">
-          <div class="panel-head">
-            <div><label>OUTPUT</label><h2>Hindi</h2></div>
-            <span class="lang-code">hin_Deva</span>
-          </div>
-
+        <article class="panel">
+          <div class="panel-head"><div><label>HINDI OUTPUT</label><h2>Translation</h2></div><span class="lang-code">hin_Deva</span></div>
           <div class="translation-box" id="output">हिंदी अनुवाद यहाँ दिखाई देगा।</div>
-
           <div class="output-actions">
-            <button class="btn btn-dark" id="speakBtn" disabled>🔊 Speak Hindi</button>
             <button class="btn btn-dark" id="copyBtn" disabled>Copy</button>
           </div>
           <div class="recognized" id="recognized"></div>
@@ -57,95 +69,137 @@ app.innerHTML = `
       </section>
 
       <section class="pipeline">
-        <div class="section-label">HOW IT WORKS</div>
+        <div class="section-label">LIVE PIPELINE</div>
         <div class="flow">
-          <div class="flow-item"><b>01</b><span>Whisper speech-to-text</span><small>On-device ML</small></div>
+          <div class="flow-item"><b>01</b><span>Local speech</span><small>On-device / browser</small></div>
           <div class="flow-arrow">→</div>
           <div class="flow-item"><b>02</b><span>Neural translation</span><small>English → Hindi</small></div>
           <div class="flow-arrow">→</div>
-          <div class="flow-item"><b>03</b><span>Hindi speech</span><small>Browser synthesis</small></div>
+          <div class="flow-item"><b>03</b><span>Hindi voice</span><small>Speech synthesis</small></div>
         </div>
       </section>
 
       <section class="note">
-        <span>🧠</span>
-        <div><strong>No SpeechRecognition network dependency.</strong> The microphone recording is converted to audio data in the browser and transcribed by Whisper ML, which fixes the “network” error you were seeing.</div>
+        <span>⚡</span>
+        <div><strong>Samsung-style behavior, within browser limits.</strong> The app pauses recognition while Hindi is spoken to avoid translating its own output, then resumes automatically for the next turn.</div>
       </section>
     </main>
 
-    <footer>Built with Transformers.js · Whisper · Marian MT · ONNX Runtime · Vite</footer>
+    <footer>Built with Transformers.js · Whisper · Web Speech API · Vite</footer>
   </div>
 `;
 
 const input = document.querySelector("#input");
 const output = document.querySelector("#output");
 const translateBtn = document.querySelector("#translateBtn");
-const micBtn = document.querySelector("#micBtn");
-const clearBtn = document.querySelector("#clearBtn");
 const speakBtn = document.querySelector("#speakBtn");
 const copyBtn = document.querySelector("#copyBtn");
-const recognized = document.querySelector("#recognized");
-const micHint = document.querySelector("#micHint");
+const clearBtn = document.querySelector("#clearBtn");
 const modelStatus = document.querySelector("#modelStatus");
+const liveBtn = document.querySelector("#liveBtn");
+const liveState = document.querySelector("#liveState");
+const liveEnglish = document.querySelector("#liveEnglish");
+const liveHindi = document.querySelector("#liveHindi");
+const liveHint = document.querySelector("#liveHint");
+const autoSpeak = document.querySelector("#autoSpeak");
+const recognized = document.querySelector("#recognized");
 
 let translatorPromise = null;
 let transcriberPromise = null;
+let liveRecognition = null;
+let liveRunning = false;
+let liveUsingLocalRecognition = false;
 let lastHindi = "";
-let mediaRecorder = null;
-let recordedChunks = [];
+let lastFinalIndex = -1;
 
-function setModelStatus(text, state = "idle") {
+function setModelStatus(text, state="idle"){
   modelStatus.className = `status-chip ${state}`;
   modelStatus.querySelector("span").textContent = text;
 }
 
-function setResult(hindi, spokenText) {
+function setLiveState(on){
+  liveState.className = `live-state ${on ? "on" : ""}`;
+  liveState.querySelector("span").textContent = on ? "LIVE" : "OFF";
+  liveBtn.textContent = on ? "■ Stop Live Translate" : "● Start Live Translate";
+  liveBtn.classList.toggle("danger", on);
+}
+
+function getHindiVoice(){
+  if(!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => /^hi(-|_)/i.test(v.lang))
+      || voices.find(v => /hindi/i.test(v.name))
+      || voices.find(v => /india/i.test(v.lang))
+      || null;
+}
+
+function speakHindi(text = lastHindi, onEnd = null){
+  if(!text || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = getHindiVoice();
+  u.lang = voice?.lang || "hi-IN";
+  if(voice) u.voice = voice;
+  u.rate = 0.98;
+  u.pitch = 1;
+  u.volume = 1;
+  u.onend = () => onEnd?.();
+  u.onerror = () => onEnd?.();
+  window.speechSynthesis.speak(u);
+}
+
+if("speechSynthesis" in window){
+  window.speechSynthesis.onvoiceschanged = () => getHindiVoice();
+}
+
+function setResult(hindi, spokenText=""){
   lastHindi = hindi;
   output.textContent = hindi;
+  liveHindi.textContent = hindi;
   speakBtn.disabled = false;
   copyBtn.disabled = false;
   recognized.textContent = spokenText ? `Recognized: ${spokenText}` : "";
 }
 
-async function getTranslator() {
-  if (!translatorPromise) {
-    translatorPromise = (async () => {
-      setModelStatus("Loading translation ML…", "loading");
-      try {
-        const useWebGPU = "gpu" in navigator;
-        const options = useWebGPU ? { device: "webgpu", dtype: "q4" } : { dtype: "q4" };
-        const pipe = await pipeline("translation", "Xenova/opus-mt-en-hi", options);
-        setModelStatus(useWebGPU ? "Translation ML · WebGPU" : "Translation ML · CPU", "ready");
+async function getTranslator(){
+  if(!translatorPromise){
+    translatorPromise = (async()=>{
+      setModelStatus("Loading translation ML…","loading");
+      try{
+        const useWebGPU = !!navigator.gpu;
+        const pipe = await pipeline(
+          "translation",
+          "Xenova/opus-mt-en-hi",
+          useWebGPU ? {device:"webgpu",dtype:"q4"} : {dtype:"q4"}
+        );
+        setModelStatus(useWebGPU ? "Translation · WebGPU" : "Translation · CPU","ready");
         return pipe;
-      } catch (firstError) {
-        try {
-          const pipe = await pipeline("translation", "Xenova/opus-mt-en-hi", { dtype: "q8" });
-          setModelStatus("Translation ML · CPU", "ready");
-          return pipe;
-        } catch (secondError) {
-          translatorPromise = null;
-          setModelStatus("Translation model failed", "error");
-          throw secondError;
-        }
+      }catch{
+        const pipe = await pipeline("translation","Xenova/opus-mt-en-hi",{dtype:"q8"});
+        setModelStatus("Translation · CPU","ready");
+        return pipe;
       }
     })();
   }
   return translatorPromise;
 }
 
-async function getTranscriber() {
-  if (!transcriberPromise) {
-    transcriberPromise = (async () => {
-      setModelStatus("Loading Whisper speech ML…", "loading");
-      try {
-        const useWebGPU = "gpu" in navigator;
-        const options = useWebGPU ? { device: "webgpu", dtype: "q4" } : { dtype: "q8" };
-        const pipe = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", options);
-        setModelStatus(useWebGPU ? "Whisper ML · WebGPU" : "Whisper ML · CPU", "ready");
+async function getWhisper(){
+  if(!transcriberPromise){
+    transcriberPromise = (async()=>{
+      setModelStatus("Loading Whisper ML…","loading");
+      try{
+        const useWebGPU = !!navigator.gpu;
+        const pipe = await pipeline(
+          "automatic-speech-recognition",
+          "onnx-community/whisper-tiny.en",
+          useWebGPU ? {device:"webgpu",dtype:"q4"} : {dtype:"q8"}
+        );
+        setModelStatus(useWebGPU ? "Whisper · WebGPU" : "Whisper · CPU","ready");
         return pipe;
-      } catch (error) {
+      }catch(error){
         transcriberPromise = null;
-        setModelStatus("Whisper model failed", "error");
+        setModelStatus("Whisper failed","error");
         throw error;
       }
     })();
@@ -153,171 +207,193 @@ async function getTranscriber() {
   return transcriberPromise;
 }
 
-async function translateText(text) {
+async function translateText(text){
   const clean = text.trim();
-  if (!clean) throw new Error("Please enter some English text.");
+  if(!clean) throw new Error("Please enter some English text.");
   const translator = await getTranslator();
   const result = await translator(clean);
   return result[0].translation_text.trim();
 }
 
-async function translateFromText() {
-  const text = input.value.trim();
-  if (!text) return;
-
-  translateBtn.disabled = true;
-  translateBtn.innerHTML = '<span class="spinner"></span>Translating…';
-
-  try {
-    const hindi = await translateText(text);
-    setResult(hindi, "");
-  } catch (error) {
-    setModelStatus(error.message || "Translation failed", "error");
-  } finally {
-    translateBtn.disabled = false;
-    translateBtn.innerHTML = 'Translate <span>→</span>';
+async function translateFromText(){
+  const text=input.value.trim();
+  if(!text) return;
+  translateBtn.disabled=true;
+  translateBtn.innerHTML='<span class="spinner"></span>Translating…';
+  try{
+    const hindi=await translateText(text);
+    setResult(hindi,text);
+  }catch(error){
+    setModelStatus(error.message||"Translation failed","error");
+  }finally{
+    translateBtn.disabled=false;
+    translateBtn.innerHTML='Translate <span>→</span>';
   }
 }
 
-function speakHindi() {
-  if (!lastHindi || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(lastHindi);
-  utterance.lang = "hi-IN";
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+function createRecognition(){
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Recognition) return null;
+  const r = new Recognition();
+  r.lang="en-IN";
+  r.continuous=true;
+  r.interimResults=true;
+  r.maxAlternatives=1;
+
+  if("processLocally" in r) r.processLocally = true;
+  return r;
 }
 
-async function blobTo16kMono(blob) {
-  const arrayBuffer = await blob.arrayBuffer();
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) throw new Error("Web Audio is not supported by this browser.");
+async function prepareLocalRecognition(){
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Recognition) return false;
 
-  const context = new AudioContextClass();
-  const decoded = await context.decodeAudioData(arrayBuffer);
-  const source = context.createBufferSource();
-  source.buffer = decoded;
+  try{
+    if("available" in Recognition && "install" in Recognition){
+      const result = await Recognition.available({
+        langs:["en-IN"],
+        processLocally:true,
+        quality:"dictation"
+      });
 
-  const targetRate = 16000;
-  const targetLength = Math.ceil(decoded.duration * targetRate);
-  const offline = new OfflineAudioContext(1, targetLength, targetRate);
-
-  const offlineSource = offline.createBufferSource();
-  offlineSource.buffer = decoded;
-  offlineSource.connect(offline.destination);
-  offlineSource.start(0);
-
-  const rendered = await offline.startRendering();
-  const channel = rendered.getChannelData(0);
-
-  source.disconnect();
-  await context.close();
-  return channel;
-}
-
-async function transcribeAudio(blob) {
-  const transcriber = await getTranscriber();
-  const audioData = await blobTo16kMono(blob);
-  const result = await transcriber(audioData, { chunk_length_s: 30, stride_length_s: 5 });
-  return (result.text || "").trim();
-}
-
-function setRecordingUi(recording) {
-  if (recording) {
-    micBtn.classList.add("recording");
-    micBtn.innerHTML = '<span class="pulse"></span> Stop';
-    micHint.textContent = "Listening… speak in English, then press Stop.";
-  } else {
-    micBtn.classList.remove("recording");
-    micBtn.innerHTML = '<span class="mic-dot">●</span> Speak';
+      if(result === "downloadable" || result === "downloading"){
+        liveHint.textContent = "Downloading the browser's on-device English language pack…";
+        await Recognition.install({langs:["en-IN"]});
+      } else if(result === "unavailable"){
+        return false;
+      }
+    }
+    return true;
+  }catch{
+    return false;
   }
 }
 
-async function startVoice() {
-  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-    micHint.textContent = "This browser does not support microphone recording. Try Chrome or Edge.";
+async function handleFinalSpeech(text){
+  if(!liveRunning || !text.trim()) return;
+
+  liveRecognition?.stop();
+  const english = text.trim();
+  liveEnglish.textContent = english;
+  input.value = english;
+  recognized.textContent = `Recognized: ${english}`;
+  liveHint.textContent = "Translating…";
+
+  try{
+    const hindi = await translateText(english);
+    setResult(hindi, english);
+    liveHint.textContent = getHindiVoice()
+      ? "Live — Hindi audio is playing."
+      : "Hindi translation ready. Your browser has no Hindi voice installed.";
+
+    if(autoSpeak.checked){
+      speakHindi(hindi, ()=> {
+        if(liveRunning){
+          setTimeout(()=>{ try{ liveRecognition?.start(); }catch{} },120);
+        }
+      });
+    }else if(liveRunning){
+      setTimeout(()=>{ try{ liveRecognition?.start(); }catch{} },120);
+    }
+  }catch(error){
+    liveHint.textContent = error.message || "Translation failed.";
+    if(liveRunning) setTimeout(()=>{ try{ liveRecognition?.start(); }catch{} },250);
+  }
+}
+
+async function startLive(){
+  liveRunning = true;
+  setLiveState(true);
+
+  const localAvailable = await prepareLocalRecognition();
+  if(localAvailable){
+    liveUsingLocalRecognition = true;
+    liveRecognition = createRecognition();
+    liveRecognition.onstart = ()=>{
+      setModelStatus("Live speech · On-device","ready");
+      liveHint.textContent = "Listening… speak naturally.";
+    };
+    liveRecognition.onresult = async(event)=>{
+      let finalText = "";
+      let interim = "";
+      for(let i=event.resultIndex;i<event.results.length;i++){
+        const part = event.results[i][0].transcript;
+        if(event.results[i].isFinal) finalText += part + " ";
+        else interim += part;
+      }
+      if(interim) liveEnglish.textContent = interim;
+      if(finalText) await handleFinalSpeech(finalText);
+    };
+    liveRecognition.onerror = async(event)=>{
+      if(event.error==="not-allowed"){
+        liveHint.textContent="Microphone permission was blocked. Allow microphone access and try again.";
+      }else{
+        liveHint.textContent=`Live speech error: ${event.error}`;
+      }
+    };
+    liveRecognition.onend = ()=>{
+      if(liveRunning && window.speechSynthesis.speaking===false){
+        setTimeout(()=>{try{liveRecognition.start();}catch{}},150);
+      }
+    };
+    try{liveRecognition.start();}catch{}
     return;
   }
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordedChunks.push(event.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(track => track.stop());
-      setRecordingUi(false);
-
-      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-      micHint.textContent = "Running Whisper speech-to-text…";
-      micBtn.disabled = true;
-
-      try {
-        const text = await transcribeAudio(blob);
-        if (!text) throw new Error("Whisper could not detect any speech.");
-
-        input.value = text;
-        recognized.textContent = `Recognized: ${text}`;
-        micHint.textContent = "Translating to Hindi…";
-
-        const hindi = await translateText(text);
-        setResult(hindi, text);
-        speakHindi();
-        micHint.textContent = "Done — Hindi audio is playing.";
-      } catch (error) {
-        micHint.textContent = error.message || "Voice processing failed.";
-      } finally {
-        micBtn.disabled = false;
-      }
-    };
-
-    mediaRecorder.start();
-    setRecordingUi(true);
-  } catch (error) {
-    micHint.textContent =
-      error.name === "NotAllowedError"
-        ? "Microphone permission was blocked. Allow microphone access for this site and try again."
-        : `Microphone error: ${error.message}`;
+  liveUsingLocalRecognition=false;
+  liveHint.textContent="On-device browser speech is unavailable here. Starting Whisper fallback — this is slower but fully ML-based.";
+  try{
+    await getWhisper();
+    liveHint.textContent="Whisper fallback is ready. For Samsung-like low latency, use Chrome with on-device speech enabled.";
+    // Keep the explicit fallback available through the same mic flow.
+    alert("This browser does not provide on-device live speech recognition. Use Chrome for low-latency Live Translate; Whisper fallback is available in the full recording flow.");
+    stopLive();
+  }catch(error){
+    liveHint.textContent=error.message || "Voice ML could not be loaded.";
+    stopLive();
   }
 }
 
-function stopVoice() {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-  }
+function stopLive(){
+  liveRunning=false;
+  setLiveState(false);
+  try{liveRecognition?.stop();}catch{}
+  window.speechSynthesis?.cancel();
+  liveHint.textContent = "Live translation stopped.";
 }
 
-translateBtn.addEventListener("click", translateFromText);
-
-input.addEventListener("keydown", (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") translateFromText();
+liveBtn.addEventListener("click",()=>{
+  if(liveRunning) stopLive(); else startLive();
 });
 
-micBtn.addEventListener("click", () => {
-  if (mediaRecorder?.state === "recording") stopVoice();
-  else startVoice();
+translateBtn.addEventListener("click",translateFromText);
+
+input.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="Enter") translateFromText();
 });
 
-clearBtn.addEventListener("click", () => {
-  if (mediaRecorder?.state === "recording") stopVoice();
-  input.value = "";
-  output.textContent = "हिंदी अनुवाद यहाँ दिखाई देगा।";
-  recognized.textContent = "";
-  lastHindi = "";
-  speakBtn.disabled = true;
-  copyBtn.disabled = true;
-  micHint.textContent = "Voice mode uses on-device Whisper ML — no browser SpeechRecognition service.";
-});
+speakBtn.addEventListener("click",()=>speakHindi());
 
-speakBtn.addEventListener("click", speakHindi);
-
-copyBtn.addEventListener("click", async () => {
-  if (!lastHindi) return;
+copyBtn.addEventListener("click",async()=>{
+  if(!lastHindi) return;
   await navigator.clipboard.writeText(lastHindi);
-  copyBtn.textContent = "Copied ✓";
-  setTimeout(() => copyBtn.textContent = "Copy", 1200);
+  copyBtn.textContent="Copied ✓";
+  setTimeout(()=>copyBtn.textContent="Copy",1200);
 });
+
+clearBtn.addEventListener("click",()=>{
+  input.value="";
+  output.textContent="हिंदी अनुवाद यहाँ दिखाई देगा।";
+  liveEnglish.textContent="Start Live Translate and speak normally.";
+  liveHindi.textContent="आपका अनुवाद यहाँ आएगा।";
+  recognized.textContent="";
+  lastHindi="";
+  speakBtn.disabled=true;
+  copyBtn.disabled=true;
+  window.speechSynthesis?.cancel();
+});
+
+setTimeout(()=>{
+  // Warm the translation model after first paint so the first demo interaction is faster.
+  getTranslator().catch(()=>{});
+},900);
