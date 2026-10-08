@@ -13,13 +13,23 @@ const voiceMessage = document.getElementById("voiceMessage");
 const autoSpeak = document.getElementById("autoSpeak");
 
 let currentHindi = "";
-let recognition = null;
 let liveMode = false;
 let translating = false;
-let recognitionRunning = false;
-let restartTimer = null;
-let lastError = "";
-let errorCount = 0;
+let recording = false;
+let mediaRecorder = null;
+let mediaStream = null;
+let audioContext = null;
+let analyser = null;
+let audioFrame = null;
+let silenceTimer = null;
+let speechStarted = false;
+let speechStartTime = 0;
+
+const START_THRESHOLD = 0.018;
+const SILENCE_THRESHOLD = 0.010;
+const SILENCE_MS = 800;
+const MIN_SPEECH_MS = 450;
+const MAX_TURN_MS = 10000;
 
 function setButtonsDisabled(disabled) {
     translateBtn.disabled = disabled;
@@ -29,9 +39,7 @@ function setButtonsDisabled(disabled) {
 async function translateText(text) {
     const response = await fetch("/api/translate", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
     });
 
@@ -42,6 +50,24 @@ async function translateText(text) {
     }
 
     return data.hindi;
+}
+
+async function transcribeRecording(blob) {
+    const formData = new FormData();
+    formData.append("audio", blob, "voice-turn.webm");
+
+    const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || "Speech recognition failed.");
+    }
+
+    return (data.text || "").trim();
 }
 
 function speakHindi(text, onFinished = null) {
@@ -73,9 +99,12 @@ function speakHindi(text, onFinished = null) {
     };
 
     speech.onend = () => {
-        voiceMessage.textContent = liveMode
-            ? "Listening for the next sentence…"
-            : "Hindi audio finished.";
+        if (liveMode) {
+            voiceMessage.textContent = "Listening for the next sentence…";
+        } else {
+            voiceMessage.textContent = "Hindi audio finished.";
+        }
+
         onFinished?.();
     };
 
@@ -93,11 +122,6 @@ async function doTranslation(text, fromLive = false) {
 
     translating = true;
 
-    // Do not let the microphone hear the Hindi output.
-    if (fromLive) {
-        stopRecognitionOnly();
-    }
-
     try {
         if (!fromLive) {
             setButtonsDisabled(true);
@@ -111,27 +135,27 @@ async function doTranslation(text, fromLive = false) {
 
         currentHindi = hindi;
         result.textContent = hindi;
+        liveHindi.textContent = hindi;
         speakBtn.disabled = false;
         copyBtn.disabled = false;
 
         if (fromLive) {
-            liveHindi.textContent = hindi;
-
             if (autoSpeak.checked) {
                 speakHindi(hindi, () => {
                     if (liveMode) {
-                        scheduleRecognitionRestart(120);
+                        startRecordingTurn();
                     }
                 });
-            } else {
-                scheduleRecognitionRestart(120);
+            } else if (liveMode) {
+                startRecordingTurn();
             }
         }
-
     } catch (error) {
         if (fromLive) {
             voiceMessage.textContent = "Translation error: " + error.message;
-            scheduleRecognitionRestart(500);
+            if (liveMode) {
+                setTimeout(startRecordingTurn, 300);
+            }
         } else {
             result.textContent = error.message;
         }
@@ -141,6 +165,218 @@ async function doTranslation(text, fromLive = false) {
         if (!fromLive) {
             setButtonsDisabled(false);
         }
+    }
+}
+
+async function processVoiceTurn(blob) {
+    voiceMessage.textContent = "Understanding your speech…";
+
+    try {
+        const text = await transcribeRecording(blob);
+
+        if (!text) {
+            throw new Error("No speech detected. Please speak again.");
+        }
+
+        liveEnglish.textContent = text;
+        textInput.value = text;
+
+        await doTranslation(text, true);
+    } catch (error) {
+        voiceMessage.textContent = error.message;
+
+        if (liveMode) {
+            setTimeout(startRecordingTurn, 500);
+        }
+    }
+}
+
+function cleanupAudio() {
+    if (audioFrame) {
+        cancelAnimationFrame(audioFrame);
+        audioFrame = null;
+    }
+
+    clearTimeout(silenceTimer);
+    silenceTimer = null;
+
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
+
+    if (audioContext) {
+        audioContext.close().catch(() => {});
+        audioContext = null;
+    }
+
+    analyser = null;
+    recording = false;
+}
+
+function finishRecordingTurn() {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") {
+        cleanupAudio();
+        return;
+    }
+
+    recording = false;
+    clearTimeout(silenceTimer);
+    silenceTimer = null;
+
+    try {
+        mediaRecorder.stop();
+    } catch (error) {
+        cleanupAudio();
+    }
+}
+
+function monitorVoice() {
+    if (!liveMode || !recording || !analyser) {
+        return;
+    }
+
+    const data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+
+    let sum = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        const normalized = (data[i] - 128) / 128;
+        sum += normalized * normalized;
+    }
+
+    const rms = Math.sqrt(sum / data.length);
+    const now = performance.now();
+
+    if (!speechStarted) {
+        if (rms >= START_THRESHOLD) {
+            speechStarted = true;
+            speechStartTime = now;
+            voiceMessage.textContent = "Listening…";
+        }
+    } else {
+        if (rms < SILENCE_THRESHOLD) {
+            if (!silenceTimer) {
+                silenceTimer = setTimeout(() => {
+                    const speechDuration = performance.now() - speechStartTime;
+
+                    if (speechDuration >= MIN_SPEECH_MS) {
+                        finishRecordingTurn();
+                    } else {
+                        silenceTimer = null;
+                    }
+                }, SILENCE_MS);
+            }
+        } else {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+        }
+
+        if (now - speechStartTime > MAX_TURN_MS) {
+            finishRecordingTurn();
+        }
+    }
+
+    audioFrame = requestAnimationFrame(monitorVoice);
+}
+
+async function startRecordingTurn() {
+    if (!liveMode || recording || translating || window.speechSynthesis?.speaking) {
+        return;
+    }
+
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const options = {};
+
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+            options.mimeType = "audio/webm;codecs=opus";
+        }
+
+        mediaRecorder = new MediaRecorder(mediaStream, options);
+        const chunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                chunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, {
+                type: mediaRecorder.mimeType || "audio/webm"
+            });
+
+            cleanupAudio();
+
+            if (blob.size > 0 && liveMode) {
+                await processVoiceTurn(blob);
+            }
+        };
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(mediaStream);
+
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.15;
+
+        source.connect(analyser);
+
+        speechStarted = false;
+        speechStartTime = 0;
+        recording = true;
+
+        liveStatus.textContent = "LISTENING";
+        liveStatus.classList.add("on");
+        voiceMessage.textContent =
+            "Listening… start speaking when you're ready.";
+
+        mediaRecorder.start();
+        audioFrame = requestAnimationFrame(monitorVoice);
+
+    } catch (error) {
+        cleanupAudio();
+
+        if (error.name === "NotAllowedError") {
+            voiceMessage.textContent =
+                "Microphone permission was blocked. Allow microphone access and try again.";
+            stopLive(false);
+        } else {
+            voiceMessage.textContent =
+                "Microphone error: " + error.message;
+
+            if (liveMode) {
+                setTimeout(startRecordingTurn, 800);
+            }
+        }
+    }
+}
+
+function stopLive(showMessage = true) {
+    liveMode = false;
+    translating = false;
+
+    if (mediaRecorder?.state === "recording") {
+        try {
+            mediaRecorder.stop();
+        } catch (error) {}
+    }
+
+    cleanupAudio();
+
+    if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+    }
+
+    liveBtn.textContent = "● Start Live";
+    liveStatus.textContent = "OFF";
+    liveStatus.classList.remove("on");
+
+    if (showMessage) {
+        voiceMessage.textContent = "Live translation stopped.";
     }
 }
 
@@ -174,219 +410,27 @@ clearBtn.addEventListener("click", () => {
     currentHindi = "";
 
     result.textContent = "हिंदी अनुवाद यहाँ दिखाई देगा।";
+    liveEnglish.textContent = "Press “Start Live” and speak in English.";
+    liveHindi.textContent = "आपका अनुवाद यहाँ आएगा।";
     speakBtn.disabled = true;
     copyBtn.disabled = true;
 });
 
-function createRecognition() {
-    const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-        voiceMessage.textContent =
-            "Live voice is not supported in this browser. Use Google Chrome.";
-        return null;
-    }
-
-    const r = new SpeechRecognition();
-
-    // One sentence at a time makes the interpreter loop much more reliable.
-    r.lang = "en-IN";
-    r.continuous = false;
-    r.interimResults = false;
-    r.maxAlternatives = 1;
-
-    r.onstart = () => {
-        recognitionRunning = true;
-        errorCount = 0;
-        liveStatus.textContent = "LISTENING";
-        liveStatus.classList.add("on");
-        voiceMessage.textContent = "Listening… speak naturally.";
-    };
-
-    r.onresult = event => {
-        const spokenText =
-            event.results[0][0].transcript.trim();
-
-        if (!spokenText) {
-            scheduleRecognitionRestart(150);
-            return;
-        }
-
-        liveEnglish.textContent = spokenText;
-        textInput.value = spokenText;
-
-        // This call stops recognition before the translation/audio cycle.
-        doTranslation(spokenText, true);
-    };
-
-    r.onerror = event => {
-        recognitionRunning = false;
-        lastError = event.error;
-
-        if (!liveMode) {
-            return;
-        }
-
-        // These errors are usually temporary session/browser issues.
-        // Do NOT turn Live mode off automatically.
-        if (
-            event.error === "no-speech" ||
-            event.error === "aborted" ||
-            event.error === "audio-capture" ||
-            event.error === "network"
-        ) {
-            errorCount += 1;
-
-            if (event.error === "network") {
-                voiceMessage.textContent =
-                    "Speech service interrupted — retrying…";
-            } else if (event.error === "no-speech") {
-                voiceMessage.textContent =
-                    "No speech detected — still listening…";
-            } else {
-                voiceMessage.textContent =
-                    "Voice session restarted…";
-            }
-
-            const delay = Math.min(2500, 200 + errorCount * 300);
-            scheduleRecognitionRestart(delay);
-            return;
-        }
-
-        if (event.error === "not-allowed" ||
-            event.error === "service-not-allowed") {
-            voiceMessage.textContent =
-                "Microphone permission/service was blocked. Allow microphone access and start Live again.";
-            stopLive(false);
-            return;
-        }
-
-        voiceMessage.textContent = "Voice error: " + event.error;
-        scheduleRecognitionRestart(800);
-    };
-
-    r.onend = () => {
-        recognitionRunning = false;
-
-        if (!liveMode || translating || window.speechSynthesis?.speaking) {
-            return;
-        }
-
-        // SpeechRecognition normally ends after one phrase.
-        // Immediately schedule the next listening session.
-        scheduleRecognitionRestart(150);
-    };
-
-    return r;
-}
-
-function startRecognitionOnly() {
-    if (!liveMode || translating || window.speechSynthesis?.speaking) {
-        return;
-    }
-
-    if (!recognition) {
-        recognition = createRecognition();
-    }
-
-    if (!recognition || recognitionRunning) {
-        return;
-    }
-
-    try {
-        recognition.start();
-        recognitionRunning = true;
-    } catch (error) {
-        recognitionRunning = false;
-        scheduleRecognitionRestart(500);
-    }
-}
-
-function scheduleRecognitionRestart(delay = 150) {
-    if (!liveMode || translating || window.speechSynthesis?.speaking) {
-        return;
-    }
-
-    clearTimeout(restartTimer);
-
-    restartTimer = setTimeout(() => {
-        restartTimer = null;
-        startRecognitionOnly();
-    }, delay);
-}
-
-function stopRecognitionOnly() {
-    clearTimeout(restartTimer);
-    restartTimer = null;
-
-    if (!recognition) {
-        return;
-    }
-
-    try {
-        recognition.stop();
-    } catch (error) {
-        // Ignore repeated stop calls.
-    }
-
-    recognitionRunning = false;
-}
-
-function startLive() {
-    if (!recognition) {
-        recognition = createRecognition();
-    }
-
-    if (!recognition) {
+liveBtn.addEventListener("click", () => {
+    if (liveMode) {
+        stopLive();
         return;
     }
 
     liveMode = true;
-    translating = false;
-    errorCount = 0;
-
     liveBtn.textContent = "■ Stop Live";
     liveStatus.textContent = "LIVE";
     liveStatus.classList.add("on");
-
-    liveEnglish.textContent =
-        "Listening… speak your first sentence.";
-
+    liveEnglish.textContent = "Listening… speak your first sentence.";
     voiceMessage.textContent =
-        "Live mode started. Speak one sentence at a time.";
+        "Live mode started. Speak naturally. The mic will stop automatically after a short pause.";
 
-    startRecognitionOnly();
-}
-
-function stopLive(showMessage = true) {
-    liveMode = false;
-    translating = false;
-    clearTimeout(restartTimer);
-    restartTimer = null;
-
-    stopRecognitionOnly();
-
-    if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-    }
-
-    liveBtn.textContent = "● Start Live";
-    liveStatus.textContent = "OFF";
-    liveStatus.classList.remove("on");
-
-    if (showMessage) {
-        voiceMessage.textContent = "Live translation stopped.";
-    }
-}
-
-liveBtn.addEventListener("click", () => {
-    if (liveMode) {
-        stopLive();
-    } else {
-        startLive();
-    }
+    startRecordingTurn();
 });
 
 if (window.speechSynthesis) {
