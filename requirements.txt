@@ -3,3 +3,4 @@ torch>=2.2
 transformers>=4.45
 sentencepiece>=0.2
 sacremoses>=0.1.1
+faster-whisper>=1.2,<2
