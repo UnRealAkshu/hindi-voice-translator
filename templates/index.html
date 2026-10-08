@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HindiVoice Translator</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="shell">
+<header class="hero">
+<div class="brand">🇮🇳 <span>HindiVoice</span><em>AI / ML</em></div>
+<h1>Translate anything.<br><span>Speak Hindi.</span></h1>
+<p>Type a sentence or record your voice. Convert it into Hindi text and natural Hindi audio.</p>
+</header>
+<section class="workspace">
+<div class="card">
+<div class="card-head"><div><div class="eyebrow">INPUT</div><h2>What do you want to translate?</h2></div>
+<select id="sourceLang"><option value="eng_Latn">English</option><option value="spa_Latn">Spanish</option><option value="fra_Latn">French</option><option value="deu_Latn">German</option></select></div>
+<textarea id="textInput" placeholder="Type something like: Where are you going?"></textarea>
+<div class="actions"><button id="translateBtn" class="primary">Translate to Hindi →</button><button id="recordBtn" class="secondary">🎙️ Record voice</button></div>
+<div id="recordStatus" class="status"></div>
+</div>
+<div class="card">
+<div class="card-head"><div><div class="eyebrow">HINDI OUTPUT</div><h2>Your translation</h2></div><button id="copyBtn" class="icon-btn">⧉</button></div>
+<div id="outputText" class="output">आपका हिंदी अनुवाद यहाँ दिखाई देगा।</div>
+<div class="output-meta"><span id="recognizedText"></span><button id="speakBtn" class="speak-btn" disabled>🔊 Play Hindi audio</button></div>
+<audio id="audioPlayer" controls hidden></audio>
+</div>
+</section>
+<section class="pipeline"><div class="eyebrow">AI PIPELINE</div><div class="steps"><div><b>01</b><span>Speech recognition</span></div><div><b>02</b><span>Neural translation</span></div><div><b>03</b><span>Hindi text-to-speech</span></div></div></section>
+<footer>Flask · Transformers · PyTorch · SpeechRecognition · gTTS</footer>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body></html>
