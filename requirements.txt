@@ -1,7 +1,5 @@
-flask>=3.0
-transformers>=4.45
+Flask>=3.0,<4
 torch>=2.2
+transformers>=4.45
 sentencepiece>=0.2
-SpeechRecognition>=3.10
-gTTS>=2.5
-pydub>=0.25
+sacremoses>=0.1.1

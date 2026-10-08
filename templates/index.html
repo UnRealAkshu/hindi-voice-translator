@@ -1,35 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HindiVoice Translator</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HindiVoice Translator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<main class="shell">
-<header class="hero">
-<div class="brand">🇮🇳 <span>HindiVoice</span><em>AI / ML</em></div>
-<h1>Translate anything.<br><span>Speak Hindi.</span></h1>
-<p>Type a sentence or record your voice. Convert it into Hindi text and natural Hindi audio.</p>
-</header>
-<section class="workspace">
-<div class="card">
-<div class="card-head"><div><div class="eyebrow">INPUT</div><h2>What do you want to translate?</h2></div>
-<select id="sourceLang"><option value="eng_Latn">English</option><option value="spa_Latn">Spanish</option><option value="fra_Latn">French</option><option value="deu_Latn">German</option></select></div>
-<textarea id="textInput" placeholder="Type something like: Where are you going?"></textarea>
-<div class="actions"><button id="translateBtn" class="primary">Translate to Hindi →</button><button id="recordBtn" class="secondary">🎙️ Record voice</button></div>
-<div id="recordStatus" class="status"></div>
+<div class="container">
+    <header class="hero">
+        <div class="badge">BTECH CSE AIML PROJECT</div>
+        <h1>HindiVoice <span>Translator</span></h1>
+        <p>English text or voice → Hindi text → Hindi audio. A simple neural machine translation project built with Python.</p>
+    </header>
+
+    <section class="card live-card">
+        <div class="section-top">
+            <div><small>LIVE MODE</small><h2>English → Hindi Interpreter</h2></div>
+            <div id="liveStatus" class="status off">OFF</div>
+        </div>
+
+        <div class="conversation">
+            <div class="bubble"><small>YOU</small><p id="liveEnglish">Press “Start Live” and speak in English.</p></div>
+            <div class="arrow">→</div>
+            <div class="bubble hindi"><small>HINDI</small><p id="liveHindi">आपका अनुवाद यहाँ आएगा।</p></div>
+        </div>
+
+        <div class="button-row">
+            <button id="liveBtn" class="btn primary">● Start Live</button>
+            <label class="check"><input type="checkbox" id="autoSpeak" checked><span>Speak Hindi automatically</span></label>
+        </div>
+
+        <p id="voiceMessage" class="message">
+            Best experience: Google Chrome on desktop. The browser handles microphone recognition; Python handles the neural translation.
+        </p>
+    </section>
+
+    <section class="grid">
+        <div class="card">
+            <div class="section-top">
+                <div><small>TEXT MODE</small><h2>English Input</h2></div>
+                <span class="lang">eng → hin</span>
+            </div>
+            <textarea id="textInput" placeholder="Example: Where are you going?"></textarea>
+            <div class="button-row">
+                <button id="translateBtn" class="btn primary">Translate →</button>
+                <button id="clearBtn" class="btn secondary">Clear</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-top">
+                <div><small>RESULT</small><h2>Hindi Output</h2></div>
+                <span class="lang">hin</span>
+            </div>
+            <div id="result" class="result">हिंदी अनुवाद यहाँ दिखाई देगा।</div>
+            <div class="button-row">
+                <button id="speakBtn" class="btn secondary" disabled>🔊 Speak Hindi</button>
+                <button id="copyBtn" class="btn secondary" disabled>Copy</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="card pipeline">
+        <small>PROJECT PIPELINE</small>
+        <div class="steps">
+            <div class="step"><b>1</b><span>Speech Recognition</span><small>Browser voice input</small></div>
+            <div class="step"><b>2</b><span>Neural Translation</span><small>Helsinki-NLP model</small></div>
+            <div class="step"><b>3</b><span>Hindi Speech</span><small>Browser text-to-speech</small></div>
+        </div>
+    </section>
+
+    <footer>Python + Flask + Transformers + PyTorch + HTML/CSS/JavaScript</footer>
 </div>
-<div class="card">
-<div class="card-head"><div><div class="eyebrow">HINDI OUTPUT</div><h2>Your translation</h2></div><button id="copyBtn" class="icon-btn">⧉</button></div>
-<div id="outputText" class="output">आपका हिंदी अनुवाद यहाँ दिखाई देगा।</div>
-<div class="output-meta"><span id="recognizedText"></span><button id="speakBtn" class="speak-btn" disabled>🔊 Play Hindi audio</button></div>
-<audio id="audioPlayer" controls hidden></audio>
-</div>
-</section>
-<section class="pipeline"><div class="eyebrow">AI PIPELINE</div><div class="steps"><div><b>01</b><span>Speech recognition</span></div><div><b>02</b><span>Neural translation</span></div><div><b>03</b><span>Hindi text-to-speech</span></div></div></section>
-<footer>Flask · Transformers · PyTorch · SpeechRecognition · gTTS</footer>
-</main>
-<script src="{{ url_for('static', filename='app.js') }}"></script>
-</body></html>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
